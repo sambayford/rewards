@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rewards">
+<meta name="theme-color" content="#0f0f12">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Rewards — Chore Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0f0f12;
+    --surface: #1a1a20;
+    --surface2: #22222a;
+    --border: #2e2e38;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --positive: #4ade80;
+    --positive-dim: rgba(74,222,128,0.12);
+    --negative: #f87171;
+    --negative-dim: rgba(248,113,113,0.12);
+    --accent: #a78bfa;
+    --accent-dim: rgba(167,139,250,0.15);
+    --gold: #fbbf24;
+    --gold-dim: rgba(251,191,36,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.5;
+    min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: none;
+  }
+
+  .app { max-width: 480px; margin: 0 auto; padding: 0 16px 100px; }
+
+  header {
+    padding: 24px 0 16px; display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 12px;
+  }
+  .wordmark { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
+  .wordmark span { color: var(--gold); }
+  .date-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+  .total-block { text-align: right; }
+  .total-value { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; color: var(--gold); }
+  .total-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
+  .section-title { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .add-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 18px; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .add-btn:active { background: var(--surface2); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Kid cards */
+  .kid-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; -webkit-tap-highlight-color: transparent; user-select: none; transition: opacity 0.15s, transform 0.15s; }
+  .kid-top { display: flex; align-items: center; gap: 12px; }
+  .kid-icon { font-size: 26px; width: 36px; text-align: center; flex-shrink: 0; }
+  .kid-info { flex: 1; min-width: 0; }
+  .kid-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kid-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .kid-owed { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 700; color: var(--gold); text-align: right; flex-shrink: 0; }
+
+  .kid-bottom { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .kid-counter { display: flex; align-items: center; gap: 8px; }
+  .counter-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 300; line-height: 1; transition: all 0.12s; flex-shrink: 0; -webkit-tap-highlight-color: transparent; color: var(--muted); }
+  .counter-btn.plus { border-color: var(--positive); color: var(--positive); }
+  .counter-btn.plus:active { background: var(--positive-dim); transform: scale(0.9); }
+  .counter-btn.minus { border-color: var(--negative); color: var(--negative); }
+  .counter-btn.minus:active { background: var(--negative-dim); transform: scale(0.9); }
+  .counter-btn:disabled { opacity: 0.25; pointer-events: none; }
+  .counter-val { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; min-width: 28px; text-align: center; line-height: 1; }
+  .counter-val.zero { color: var(--muted); font-size: 16px; }
+
+  .cashout-btn { flex: 1; background: var(--gold-dim); border: 1px solid var(--gold); color: var(--gold); font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 10px; padding: 0 14px; height: 36px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .cashout-btn:active { background: rgba(251,191,36,0.28); }
+  .cashout-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+  .edit-hint { text-align: center; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 10px; opacity: 0.7; }
+
+  .empty { text-align: center; padding: 32px 16px; color: var(--muted); font-size: 13px; border: 1px dashed var(--border); border-radius: 14px; margin-bottom: 8px; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,15,18,0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); gap: 4px; justify-content: center; z-index: 100; }
+  .nav-btn { background: none; border: none; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px 28px; border-radius: 20px; transition: background 0.15s, color 0.15s; -webkit-tap-highlight-color: transparent; flex: 1; }
+  .nav-btn .icon { font-size: 22px; line-height: 1; }
+  .nav-btn.active { background: var(--surface2); color: var(--text); }
+
+  /* History */
+  .history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+  .history-icon { font-size: 20px; width: 30px; text-align: center; flex-shrink: 0; }
+  .history-info { flex: 1; min-width: 0; }
+  .history-name { font-weight: 500; font-size: 13px; }
+  .history-sub { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .history-amount { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700; color: var(--gold); flex-shrink: 0; }
+
+  /* Settings */
+  .settings-row { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; }
+  .settings-row-label { font-weight: 500; }
+  .settings-row-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .settings-row.danger { border-color: rgba(248,113,113,0.35); }
+  .settings-row.danger .settings-row-label { color: var(--negative); }
+
+  .cl-entry { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .cl-entry:last-child { border-bottom: none; }
+  .cl-version { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .cl-list { padding-left: 18px; font-size: 13px; color: var(--text); }
+  .cl-list li { margin-bottom: 4px; }
+  .cl-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+
+  .about-block { text-align: center; color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; margin: 24px 0; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; z-index: 200; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 86dvh; overflow-y: auto; }
+  .modal-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 15px; padding: 10px 12px; border-radius: 10px; font-family: 'Inter', sans-serif; }
+  .field input:focus { outline: none; border-color: var(--accent); }
+
+  .emoji-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .emoji-opt { width: 42px; height: 42px; border-radius: 10px; border: 2px solid var(--border); background: var(--surface2); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .emoji-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .btn { flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .btn-primary { background: var(--accent); color: #17141f; }
+  .btn-gold { background: var(--gold); color: #17141f; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: none; color: var(--negative); border: 1px solid rgba(248,113,113,0.4); }
+
+  .cashout-summary { text-align: center; padding: 16px 0 6px; }
+  .cashout-points { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .cashout-amount { font-family: 'Fraunces', serif; font-size: 38px; font-weight: 700; color: var(--gold); margin: 6px 0; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 30px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 300; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header>
+    <div>
+      <div class="wordmark">Reward<span>s</span></div>
+      <div class="date-label" id="date-label"></div>
+    </div>
+    <div class="total-block">
+      <div class="total-value" id="total-owed">£0.00</div>
+      <div class="total-label">Owed total</div>
+    </div>
+  </header>
+
+  <!-- Chores panel -->
+  <div class="panel active" id="panel-chores">
+    <div class="section-head">
+      <div class="section-title">Kids</div>
+      <button class="add-btn" onclick="openKidModal()">+</button>
+    </div>
+    <div id="kid-list"></div>
+    <div class="edit-hint" id="edit-hint" style="display:none;">Long-press a kid to edit or delete</div>
+  </div>
+
+  <!-- History panel -->
+  <div class="panel" id="panel-history">
+    <div class="section-head">
+      <div class="section-title">Cash-out history</div>
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="panel" id="panel-settings">
+    <div class="section-head">
+      <div class="section-title">Data</div>
+    </div>
+    <div class="settings-row" onclick="exportData()">
+      <div>
+        <div class="settings-row-label">Export data</div>
+        <div class="settings-row-sub">Save a backup file</div>
+      </div>
+      <div>⬇️</div>
+    </div>
+    <div class="settings-row" onclick="document.getElementById('import-file').click()">
+      <div>
+        <div class="settings-row-label">Import data</div>
+        <div class="settings-row-sub">Restore from a backup file</div>
+      </div>
+      <div>⬆️</div>
+    </div>
+    <input type="file" id="import-file" accept="application/json" onchange="importData(event)">
+    <div class="settings-row danger" onclick="resetAllData()">
+      <div>
+        <div class="settings-row-label">Reset all data</div>
+        <div class="settings-row-sub">Deletes all kids and history</div>
+      </div>
+      <div>🗑️</div>
+    </div>
+
+    <div class="section-head">
+      <div class="section-title">What's new</div>
+    </div>
+    <div class="cl-box" id="changelog"></div>
+
+    <div class="about-block" id="about-version"></div>
+  </div>
+
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" onclick="switchTab('chores', this)">
+    <span class="icon">🧾</span>
+  </button>
+  <button class="nav-btn" onclick="switchTab('history', this)">
+    <span class="icon">📜</span>
+  </button>
+  <button class="nav-btn" onclick="switchTab('settings', this)">
+    <span class="icon">⚙️</span>
+  </button>
+</nav>
+
+<!-- Add/Edit Kid Modal -->
+<div class="modal-overlay" id="kid-modal">
+  <div class="modal">
+    <div class="modal-title" id="kid-modal-title">Add Kid</div>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="kid-name-input" maxlength="24" placeholder="e.g. Alex">
+    </div>
+    <div class="field">
+      <label>Icon</label>
+      <div class="emoji-grid" id="kid-emoji-grid"></div>
+    </div>
+    <div class="field">
+      <label>Pocket money per chore (£)</label>
+      <input type="number" id="kid-rate-input" min="0" step="0.01" placeholder="0.10">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('kid-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveKid()">Save</button>
+    </div>
+    <div class="modal-actions" id="delete-kid-row" style="display:none;">
+      <button class="btn btn-danger" onclick="deleteKid()">Delete kid</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cash Out Modal -->
+<div class="modal-overlay" id="cashout-modal">
+  <div class="modal">
+    <div class="modal-title" id="cashout-modal-title">Cash Out</div>
+    <div class="cashout-summary">
+      <div class="cashout-points" id="cashout-points">0 chores</div>
+      <div class="cashout-amount" id="cashout-amount">£0.00</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('cashout-modal')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmCashout()">Confirm cash out</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const APP_VERSION = '1';
+const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
+
+let state = { kids: [] };
+let editingKidId = null;
+let selectedEmoji = KID_EMOJIS[0];
+let cashoutKidId = null;
+
+function save() { localStorage.setItem('rewards_v1', JSON.stringify(state)); }
+
+function load() {
+  try {
+    const raw = localStorage.getItem('rewards_v1');
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.kids)) state = data;
+    }
+  } catch {}
+}
+
+function fmtMoney(v) { return '£' + v.toFixed(2); }
+
+function totalOwed() {
+  return state.kids.reduce((sum, k) => sum + k.tally * k.rate, 0);
+}
+
+function render() {
+  document.getElementById('total-owed').textContent = fmtMoney(totalOwed());
+  document.getElementById('date-label').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  renderKids();
+  renderHistory();
+}
+
+function renderKids() {
+  const list = document.getElementById('kid-list');
+  const hint = document.getElementById('edit-hint');
+  if (!state.kids.length) {
+    list.innerHTML = '<div class="empty">No kids added yet.<br>Tap + to add one.</div>';
+    hint.style.display = 'none';
+    return;
+  }
+  hint.style.display = 'block';
+  list.innerHTML = state.kids.map(k => {
+    const owed = k.tally * k.rate;
+    return `
+    <div class="kid-card" data-id="${k.id}" ontouchstart="onCardTouchStart(event,'${k.id}')" ontouchend="onCardTouchEnd(event)" ontouchmove="onCardTouchMove(event)" onmousedown="onCardMouseDown(event,'${k.id}')" onmouseup="onCardMouseUp(event)" onmouseleave="onCardMouseUp(event)">
+      <div class="kid-top">
+        <div class="kid-icon">${k.icon}</div>
+        <div class="kid-info">
+          <div class="kid-name">${escapeHtml(k.name)}</div>
+          <div class="kid-meta">${fmtMoney(k.rate)} / chore</div>
+        </div>
+        <div class="kid-owed">${fmtMoney(owed)}</div>
+      </div>
+      <div class="kid-bottom">
+        <div class="kid-counter">
+          <button class="counter-btn minus" ${k.tally <= 0 ? 'disabled' : ''} onclick="adjustTally('${k.id}', -1)">−</button>
+          <span class="counter-val ${k.tally === 0 ? 'zero' : ''}">${k.tally}</span>
+          <button class="counter-btn plus" onclick="adjustTally('${k.id}', 1)">+</button>
+        </div>
+        <button class="cashout-btn" ${k.tally <= 0 ? 'disabled' : ''} onclick="openCashout('${k.id}')">Cash out</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const entries = [];
+  state.kids.forEach(k => {
+    (k.history || []).forEach(h => entries.push({ ...h, kidName: k.name, kidIcon: k.icon }));
+  });
+  entries.sort((a, b) => b.date - a.date);
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty">No cash-outs yet.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(e => `
+    <div class="history-entry">
+      <div class="history-icon">${e.kidIcon}</div>
+      <div class="history-info">
+        <div class="history-name">${escapeHtml(e.kidName)}</div>
+        <div class="history-sub">${e.points} chore${e.points === 1 ? '' : 's'} · ${new Date(e.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+      </div>
+      <div class="history-amount">${fmtMoney(e.amount)}</div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function adjustTally(id, delta) {
+  const k = state.kids.find(x => x.id === id);
+  if (!k) return;
+  k.tally = Math.max(0, k.tally + delta);
+  save();
+  renderKids();
+  document.getElementById('total-owed').textContent = fmtMoney(totalOwed());
+}
+
+// ─── Cash out ─────────────────────────────────────────────────────────────────
+function openCashout(id) {
+  const k = state.kids.find(x => x.id === id);
+  if (!k || k.tally <= 0) return;
+  cashoutKidId = id;
+  document.getElementById('cashout-modal-title').textContent = `Cash Out — ${k.name}`;
+  document.getElementById('cashout-points').textContent = `${k.tally} chore${k.tally === 1 ? '' : 's'}`;
+  document.getElementById('cashout-amount').textContent = fmtMoney(k.tally * k.rate);
+  openModal('cashout-modal');
+}
+
+function confirmCashout() {
+  const k = state.kids.find(x => x.id === cashoutKidId);
+  if (!k) return;
+  const amount = k.tally * k.rate;
+  const points = k.tally;
+  k.history = k.history || [];
+  k.history.push({ id: 'h' + Date.now(), date: Date.now(), points, amount });
+  k.tally = 0;
+  save();
+  closeModal('cashout-modal');
+  render();
+  showToast(`✅ ${k.name} cashed out ${fmtMoney(amount)}`);
+}
+
+// ─── Add / Edit kid ───────────────────────────────────────────────────────────
+function buildEmojiGrid() {
+  const grid = document.getElementById('kid-emoji-grid');
+  grid.innerHTML = KID_EMOJIS.map(e => `<div class="emoji-opt ${e === selectedEmoji ? 'selected' : ''}" data-emoji="${e}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
+}
+
+function selectEmoji(e) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-opt').forEach(el => el.classList.toggle('selected', el.dataset.emoji === e));
+}
+
+function openKidModal(id) {
+  editingKidId = id || null;
+  const isEdit = !!id;
+  document.getElementById('kid-modal-title').textContent = isEdit ? 'Edit Kid' : 'Add Kid';
+  document.getElementById('delete-kid-row').style.display = isEdit ? 'flex' : 'none';
+  if (isEdit) {
+    const k = state.kids.find(x => x.id === id);
+    document.getElementById('kid-name-input').value = k.name;
+    document.getElementById('kid-rate-input').value = k.rate.toFixed(2);
+    selectedEmoji = k.icon;
+  } else {
+    document.getElementById('kid-name-input').value = '';
+    document.getElementById('kid-rate-input').value = '0.10';
+    selectedEmoji = KID_EMOJIS[0];
+  }
+  buildEmojiGrid();
+  openModal('kid-modal');
+}
+
+function saveKid() {
+  const name = document.getElementById('kid-name-input').value.trim();
+  let rate = parseFloat(document.getElementById('kid-rate-input').value);
+  if (!name) { showToast('Give them a name'); return; }
+  if (isNaN(rate) || rate < 0) rate = 0;
+  rate = Math.round(rate * 100) / 100;
+
+  if (editingKidId) {
+    const k = state.kids.find(x => x.id === editingKidId);
+    if (k) { k.name = name; k.rate = rate; k.icon = selectedEmoji; }
+  } else {
+    state.kids.push({ id: 'k' + Date.now(), name, icon: selectedEmoji, rate, tally: 0, history: [] });
+  }
+  save();
+  closeModal('kid-modal');
+  render();
+  showToast(editingKidId ? 'Kid updated' : `✅ ${name} added`);
+}
+
+function deleteKid() {
+  if (!editingKidId) return;
+  const k = state.kids.find(x => x.id === editingKidId);
+  if (!confirm(`Delete ${k ? k.name : 'this kid'}? This also removes their cash-out history.`)) return;
+  state.kids = state.kids.filter(x => x.id !== editingKidId);
+  save();
+  closeModal('kid-modal');
+  render();
+  showToast('Kid deleted');
+}
+
+// ─── Long-press to edit (mirrors streak's card long-press pattern) ───────────
+let pressTimer = null;
+let pressStart = null;
+let pressMoved = false;
+
+function onCardTouchStart(ev, id) { startPress(id); pressMoved = false; }
+function onCardTouchMove(ev) {
+  if (!pressStart) return;
+  const t = ev.touches[0];
+  const dx = Math.abs(t.clientX - pressStart.x), dy = Math.abs(t.clientY - pressStart.y);
+  if (dx > 10 || dy > 10) { pressMoved = true; cancelPress(); }
+}
+function onCardTouchEnd(ev) { cancelPress(); }
+function onCardMouseDown(ev, id) { startPress(id); }
+function onCardMouseUp(ev) { cancelPress(); }
+
+function startPress(id) {
+  const touch = event.touches ? event.touches[0] : event;
+  pressStart = { x: touch.clientX, y: touch.clientY };
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => { if (!pressMoved) openKidModal(id); }, 550);
+}
+function cancelPress() { clearTimeout(pressTimer); pressTimer = null; }
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ─── Modal helpers ────────────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  setTimeout(() => document.querySelector(`#${id} input`)?.focus(), 100);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── Export / Import ─────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rewards-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('✅ Backup downloaded');
+}
+
+function importData(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.kids)) throw new Error('bad file');
+      if (!confirm('This will replace all current data with the backup. Continue?')) return;
+      state = { kids: data.kids };
+      save();
+      render();
+      showToast('✅ Data restored');
+    } catch {
+      showToast('⚠️ Could not read that file');
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function resetAllData() {
+  if (!confirm('Delete all kids and history? This cannot be undone.')) return;
+  state = { kids: [] };
+  save();
+  render();
+  showToast('All data reset');
+}
+
+// ─── Auto-update (cache-busting, mirrors streak's pattern) ───────────────────
+let swReg = null;
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    const sw = swReg.installing || swReg.waiting || swReg.active;
+    if (sw && sw.state !== 'activated') {
+      await new Promise(res => sw.addEventListener('statechange', e => {
+        if (e.target.state === 'activated') res();
+      }));
+    }
+    swReg = await navigator.serviceWorker.getRegistration('./');
+    checkForUpdate();
+  } catch (e) { console.warn('SW failed:', e); }
+}
+
+async function checkForUpdate() {
+  try {
+    const bust = Date.now();
+    const res = await fetch(`./index.html?_cb=${bust}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+    });
+    const html = await res.text();
+    const match = html.match(/const APP_VERSION = '(\d+)'/);
+    if (!match) return;
+    const remoteVersion = parseInt(match[1], 10);
+    const localVersion  = parseInt(APP_VERSION, 10);
+    if (remoteVersion > localVersion) {
+      if (confirm(`A new version of Rewards is available (v${remoteVersion}). Update now?\n\nYour data will be saved automatically.`)) {
+        autoUpdate();
+      }
+    }
+  } catch {}
+}
+
+async function autoUpdate() {
+  sessionStorage.setItem('rewards_update_restore', JSON.stringify(state));
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+  }
+  location.reload(true);
+}
+
+function restoreAfterUpdate() {
+  const raw = sessionStorage.getItem('rewards_update_restore');
+  if (!raw) return;
+  sessionStorage.removeItem('rewards_update_restore');
+  try {
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.kids)) return;
+    state = { kids: data.kids };
+    save();
+    showToast('✅ Data restored after update');
+  } catch {}
+}
+
+// ─── Changelog ────────────────────────────────────────────────────────────────
+function renderChangelog() {
+  document.getElementById('changelog').innerHTML = `
+    <div class="cl-entry">
+      <div class="cl-version">v1 — Current</div>
+      <ul class="cl-list">
+        <li>First release: add kids, track chores with plus/minus, cash out into pocket money</li>
+        <li>Per-kid rate, cash-out history, backup export/import</li>
+      </ul>
+    </div>
+  `;
+  document.getElementById('about-version').textContent = `Rewards v${APP_VERSION}`;
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+load();
+restoreAfterUpdate();
+renderChangelog();
+render();
+registerSW();
+</script>
+</body>
+</html>
