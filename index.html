@@ -7,9 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rewards">
 <meta name="theme-color" content="#0f0f12">
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/png" href="./icon-192.png">
-<link rel="apple-touch-icon" href="./icon-192.png">
 <title>Rewards — Chore Tracker</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap');
@@ -279,7 +276,7 @@
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '1';
+const APP_VERSION = '2';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 
 let state = { kids: [] };
@@ -562,24 +559,7 @@ function resetAllData() {
   showToast('All data reset');
 }
 
-// ─── Auto-update (cache-busting, mirrors streak's pattern) ───────────────────
-let swReg = null;
-
-async function registerSW() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    swReg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-    const sw = swReg.installing || swReg.waiting || swReg.active;
-    if (sw && sw.state !== 'activated') {
-      await new Promise(res => sw.addEventListener('statechange', e => {
-        if (e.target.state === 'activated') res();
-      }));
-    }
-    swReg = await navigator.serviceWorker.getRegistration('./');
-    checkForUpdate();
-  } catch (e) { console.warn('SW failed:', e); }
-}
-
+// ─── Auto-update (cache-busting via version check, no service worker needed) ─
 async function checkForUpdate() {
   try {
     const bust = Date.now();
@@ -606,10 +586,6 @@ async function autoUpdate() {
     const keys = await caches.keys();
     await Promise.all(keys.map(k => caches.delete(k)));
   }
-  if ('serviceWorker' in navigator) {
-    const regs = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(regs.map(r => r.unregister()));
-  }
   location.reload(true);
 }
 
@@ -630,7 +606,14 @@ function restoreAfterUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v1 — Current</div>
+      <div class="cl-version">v2 — Current</div>
+      <ul class="cl-list">
+        <li>Removed PWA extras (manifest, service worker, icons) — plain single-file app</li>
+        <li>Auto-update check no longer depends on a service worker</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v1</div>
       <ul class="cl-list">
         <li>First release: add kids, track chores with plus/minus, cash out into pocket money</li>
         <li>Per-kid rate, cash-out history, backup export/import</li>
@@ -645,7 +628,7 @@ load();
 restoreAfterUpdate();
 renderChangelog();
 render();
-registerSW();
+checkForUpdate();
 </script>
 </body>
 </html>
