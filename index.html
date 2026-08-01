@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Rewards">
 <meta name="theme-color" content="#0f0f12">
 <title>Rewards — Chore Tracker</title>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore-compat.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap');
 
@@ -38,6 +41,8 @@
   }
 
   .app { max-width: 480px; margin: 0 auto; padding: 0 16px 100px; }
+  .app, .screen { display: none; }
+  .app.active, .screen.active { display: block; }
 
   header {
     padding: 24px 0 16px; display: flex; align-items: flex-start;
@@ -106,6 +111,7 @@
   .settings-row-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .settings-row.danger { border-color: rgba(248,113,113,0.35); }
   .settings-row.danger .settings-row-label { color: var(--negative); }
+  .settings-row.static { cursor: default; }
 
   .cl-entry { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   .cl-entry:last-child { border-bottom: none; }
@@ -123,8 +129,9 @@
   .modal-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 16px; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-  .field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 15px; padding: 10px 12px; border-radius: 10px; font-family: 'Inter', sans-serif; }
-  .field input:focus { outline: none; border-color: var(--accent); }
+  .field input, .field textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 15px; padding: 10px 12px; border-radius: 10px; font-family: 'Inter', sans-serif; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .field-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
 
   .emoji-grid { display: flex; flex-wrap: wrap; gap: 8px; }
   .emoji-opt { width: 42px; height: 42px; border-radius: 10px; border: 2px solid var(--border); background: var(--surface2); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -142,15 +149,117 @@
   .cashout-amount { font-family: 'Fraunces', serif; font-size: 38px; font-weight: 700; color: var(--gold); margin: 6px 0; }
 
   /* Toast */
-  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 30px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 300; white-space: nowrap; }
+  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 30px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 300; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   input[type=file] { display: none; }
+
+  /* Setup / Auth screens */
+  .screen { min-height: 100dvh; padding: 40px 20px; max-width: 480px; margin: 0 auto; }
+  .screen-wordmark { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+  .screen-wordmark span { color: var(--gold); }
+  .screen-sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  .info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 20px; font-size: 13px; color: var(--muted); }
+  .info-box ol { padding-left: 18px; margin-top: 8px; }
+  .info-box li { margin-bottom: 6px; }
+  .info-box strong { color: var(--text); }
+  .rules-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--positive); white-space: pre-wrap; margin-top: 8px; user-select: all; }
+  .link-row { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .link-row a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  .auth-error { color: var(--negative); font-size: 12px; margin-top: -6px; margin-bottom: 12px; min-height: 14px; }
+  .toggle-row { display: flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; margin-bottom: 20px; }
+  .toggle-btn { flex: 1; background: none; border: none; padding: 9px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: 'Inter', sans-serif; }
+  .toggle-btn.active { background: var(--surface); color: var(--text); }
+  .center-spinner { text-align: center; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; margin-top: 60px; }
 </style>
 </head>
 <body>
 
-<div class="app">
+<!-- Setup screen: connect a Firebase project (first run) -->
+<div class="screen" id="setup-screen">
+  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="screen-sub">Connect your family's Firebase project</div>
+
+  <div class="info-box">
+    Rewards syncs across every parent's device using your own free
+    Firebase project — nobody else's data mixes with yours.
+    <ol>
+      <li>Go to <strong>console.firebase.google.com</strong> and create a project (free tier is enough)</li>
+      <li>In <strong>Build → Authentication</strong>, enable the <strong>Email/Password</strong> sign-in method</li>
+      <li>In <strong>Build → Firestore Database</strong>, create a database (production mode is fine)</li>
+      <li>In Firestore's <strong>Rules</strong> tab, paste this and click Publish:
+        <div class="rules-box">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</div>
+      </li>
+      <li>In <strong>Project settings → General</strong>, scroll to "Your apps", add a Web app, and copy the config values below</li>
+    </ol>
+  </div>
+
+  <div class="field">
+    <label>API Key</label>
+    <input type="text" id="cfg-apiKey" placeholder="AIzaSy...">
+  </div>
+  <div class="field">
+    <label>Auth Domain</label>
+    <input type="text" id="cfg-authDomain" placeholder="yourproject.firebaseapp.com">
+  </div>
+  <div class="field">
+    <label>Project ID</label>
+    <input type="text" id="cfg-projectId" placeholder="yourproject">
+  </div>
+  <div class="field">
+    <label>Storage Bucket</label>
+    <input type="text" id="cfg-storageBucket" placeholder="yourproject.appspot.com">
+  </div>
+  <div class="field">
+    <label>Messaging Sender ID</label>
+    <input type="text" id="cfg-messagingSenderId" placeholder="123456789">
+  </div>
+  <div class="field">
+    <label>App ID</label>
+    <input type="text" id="cfg-appId" placeholder="1:123456789:web:abc123">
+  </div>
+  <div class="auth-error" id="setup-error"></div>
+  <button class="btn btn-primary" style="width:100%" onclick="saveFirebaseConfig()">Connect</button>
+</div>
+
+<!-- Auth screen: sign in / sign up -->
+<div class="screen" id="auth-screen">
+  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="screen-sub" id="auth-project-label">Sign in to your family's project</div>
+
+  <div class="toggle-row">
+    <button class="toggle-btn active" id="toggle-signin" onclick="setAuthMode('signin')">Sign In</button>
+    <button class="toggle-btn" id="toggle-signup" onclick="setAuthMode('signup')">Sign Up</button>
+  </div>
+
+  <div class="field">
+    <label>Email</label>
+    <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email">
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <div class="auth-error" id="auth-error"></div>
+  <button class="btn btn-primary" style="width:100%" id="auth-submit-btn" onclick="submitAuth()">Sign In</button>
+
+  <div class="link-row"><a onclick="forgotPassword()">Forgot password?</a></div>
+  <div class="link-row"><a onclick="changeFirebaseProject()">Use a different Firebase project</a></div>
+</div>
+
+<div class="screen" id="loading-screen">
+  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="center-spinner">Connecting…</div>
+</div>
+
+<div class="app" id="main-app">
 
   <header>
     <div>
@@ -183,6 +292,30 @@
 
   <!-- Settings panel -->
   <div class="panel" id="panel-settings">
+    <div class="section-head">
+      <div class="section-title">Account</div>
+    </div>
+    <div class="settings-row static">
+      <div>
+        <div class="settings-row-label">Signed in</div>
+        <div class="settings-row-sub" id="signed-in-email">—</div>
+      </div>
+      <div>👤</div>
+    </div>
+    <div class="settings-row" onclick="signOutUser()">
+      <div>
+        <div class="settings-row-label">Sign out</div>
+      </div>
+      <div>🚪</div>
+    </div>
+    <div class="settings-row danger" onclick="changeFirebaseProject()">
+      <div>
+        <div class="settings-row-label">Disconnect Firebase project</div>
+        <div class="settings-row-sub">Sign out and reset the connection</div>
+      </div>
+      <div>🔌</div>
+    </div>
+
     <div class="section-head">
       <div class="section-title">Data</div>
     </div>
@@ -220,7 +353,7 @@
 </div>
 
 <!-- Bottom nav -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" id="bottom-nav" style="display:none;">
   <button class="nav-btn active" onclick="switchTab('chores', this)">
     <span class="icon">🧾</span>
   </button>
@@ -276,26 +409,171 @@
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '3';
+const APP_VERSION = '4';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
+const FIRESTORE_DOC_PATH = ['families', 'shared'];
 
 let state = { kids: [] };
 let editingKidId = null;
 let selectedEmoji = KID_EMOJIS[0];
 let cashoutKidId = null;
+let authMode = 'signin';
 
-function save() { localStorage.setItem('rewards_v1', JSON.stringify(state)); }
+let fbApp = null, fbAuth = null, fbDb = null;
+let firestoreUnsub = null;
+let dataLoaded = false;
+let saveDebounce = null;
 
-function load() {
-  try {
-    const raw = localStorage.getItem('rewards_v1');
-    if (raw) {
-      const data = JSON.parse(raw);
-      if (Array.isArray(data.kids)) state = data;
-    }
-  } catch {}
+// ─── Screen management ────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen, .app').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('bottom-nav').style.display = (id === 'main-app') ? 'flex' : 'none';
 }
 
+// ─── Firebase config (per-family, stored locally only) ───────────────────────
+function loadFirebaseConfig() {
+  try {
+    const raw = localStorage.getItem('rewards_firebase_config');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveFirebaseConfig() {
+  const cfg = {
+    apiKey: document.getElementById('cfg-apiKey').value.trim(),
+    authDomain: document.getElementById('cfg-authDomain').value.trim(),
+    projectId: document.getElementById('cfg-projectId').value.trim(),
+    storageBucket: document.getElementById('cfg-storageBucket').value.trim(),
+    messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
+    appId: document.getElementById('cfg-appId').value.trim(),
+  };
+  if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) {
+    document.getElementById('setup-error').textContent = 'Please fill in at least API Key, Auth Domain, Project ID and App ID.';
+    return;
+  }
+  document.getElementById('setup-error').textContent = '';
+  localStorage.setItem('rewards_firebase_config', JSON.stringify(cfg));
+  initFirebase(cfg);
+}
+
+function changeFirebaseProject() {
+  if (!confirm('This signs you out and forgets this project\'s connection on this device. You can reconnect (or connect a different project) afterwards.')) return;
+  try { if (fbAuth) fbAuth.signOut(); } catch {}
+  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+  localStorage.removeItem('rewards_firebase_config');
+  location.reload();
+}
+
+// ─── Firebase init ────────────────────────────────────────────────────────────
+function initFirebase(cfg) {
+  try {
+    fbApp = firebase.initializeApp(cfg);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    document.getElementById('auth-project-label').textContent = `Sign in to "${cfg.projectId}"`;
+    showScreen('loading-screen');
+    fbAuth.onAuthStateChanged(onAuthChanged);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('setup-error').textContent = 'Could not connect — check the values and try again.';
+    showScreen('setup-screen');
+  }
+}
+
+function onAuthChanged(user) {
+  if (user) {
+    document.getElementById('signed-in-email').textContent = user.email || user.uid;
+    attachFirestoreListener();
+  } else {
+    if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+    dataLoaded = false;
+    document.getElementById('auth-error').textContent = '';
+    showScreen('auth-screen');
+  }
+}
+
+function attachFirestoreListener() {
+  const docRef = fbDb.collection(FIRESTORE_DOC_PATH[0]).doc(FIRESTORE_DOC_PATH[1]);
+  firestoreUnsub = docRef.onSnapshot(snap => {
+    if (snap.exists) {
+      const data = snap.data();
+      state = { kids: Array.isArray(data.kids) ? data.kids : [] };
+    } else {
+      state = { kids: [] };
+      docRef.set(state).catch(() => {});
+    }
+    dataLoaded = true;
+    renderChangelog();
+    render();
+    showScreen('main-app');
+    checkForUpdate();
+  }, err => {
+    console.error(err);
+    showToast('⚠️ Could not load data — check Firestore rules');
+  });
+}
+
+function saveToCloud() {
+  if (!dataLoaded || !fbDb) return;
+  clearTimeout(saveDebounce);
+  saveDebounce = setTimeout(() => {
+    fbDb.collection(FIRESTORE_DOC_PATH[0]).doc(FIRESTORE_DOC_PATH[1]).set(state).catch(err => {
+      console.error(err);
+      showToast('⚠️ Could not save — check your connection');
+    });
+  }, 350);
+}
+
+// ─── Auth screen logic ────────────────────────────────────────────────────────
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('toggle-signin').classList.toggle('active', mode === 'signin');
+  document.getElementById('toggle-signup').classList.toggle('active', mode === 'signup');
+  document.getElementById('auth-submit-btn').textContent = mode === 'signin' ? 'Sign In' : 'Sign Up';
+  document.getElementById('auth-error').textContent = '';
+}
+
+function submitAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Enter an email and password.'; return; }
+
+  const action = authMode === 'signin'
+    ? fbAuth.signInWithEmailAndPassword(email, password)
+    : fbAuth.createUserWithEmailAndPassword(email, password);
+
+  action.catch(err => { errEl.textContent = friendlyAuthError(err); });
+}
+
+function friendlyAuthError(err) {
+  const map = {
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/user-not-found': 'No account with that email — try Sign Up.',
+    'auth/email-already-in-use': 'That email already has an account — try Sign In.',
+    'auth/weak-password': 'Password should be at least 6 characters.',
+    'auth/invalid-email': 'That email address looks invalid.',
+    'auth/invalid-credential': 'Incorrect email or password.',
+  };
+  return map[err.code] || err.message || 'Something went wrong.';
+}
+
+function forgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) { document.getElementById('auth-error').textContent = 'Enter your email above first, then tap this link.'; return; }
+  fbAuth.sendPasswordResetEmail(email)
+    .then(() => showToast('✅ Password reset email sent'))
+    .catch(err => { document.getElementById('auth-error').textContent = friendlyAuthError(err); });
+}
+
+function signOutUser() {
+  if (!confirm('Sign out of Rewards?')) return;
+  fbAuth.signOut();
+}
+
+// ─── App data / rendering ─────────────────────────────────────────────────────
 function fmtMoney(v) { return '$' + v.toFixed(2); }
 
 function totalOwed() {
@@ -375,7 +653,7 @@ function adjustTally(id, delta) {
   const k = state.kids.find(x => x.id === id);
   if (!k) return;
   k.tally = Math.max(0, k.tally + delta);
-  save();
+  saveToCloud();
   renderKids();
   document.getElementById('total-owed').textContent = fmtMoney(totalOwed());
 }
@@ -399,7 +677,7 @@ function confirmCashout() {
   k.history = k.history || [];
   k.history.push({ id: 'h' + Date.now(), date: Date.now(), points, amount });
   k.tally = 0;
-  save();
+  saveToCloud();
   closeModal('cashout-modal');
   render();
   showToast(`✅ ${k.name} cashed out ${fmtMoney(amount)}`);
@@ -448,7 +726,7 @@ function saveKid() {
   } else {
     state.kids.push({ id: 'k' + Date.now(), name, icon: selectedEmoji, rate, tally: 0, history: [] });
   }
-  save();
+  saveToCloud();
   closeModal('kid-modal');
   render();
   showToast(editingKidId ? 'Kid updated' : `✅ ${name} added`);
@@ -459,7 +737,7 @@ function deleteKid() {
   const k = state.kids.find(x => x.id === editingKidId);
   if (!confirm(`Delete ${k ? k.name : 'this kid'}? This also removes their cash-out history.`)) return;
   state.kids = state.kids.filter(x => x.id !== editingKidId);
-  save();
+  saveToCloud();
   closeModal('kid-modal');
   render();
   showToast('Kid deleted');
@@ -538,9 +816,9 @@ function importData(ev) {
     try {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data.kids)) throw new Error('bad file');
-      if (!confirm('This will replace all current data with the backup. Continue?')) return;
+      if (!confirm('This will replace all current data (for every parent) with the backup. Continue?')) return;
       state = { kids: data.kids };
-      save();
+      saveToCloud();
       render();
       showToast('✅ Data restored');
     } catch {
@@ -552,14 +830,14 @@ function importData(ev) {
 }
 
 function resetAllData() {
-  if (!confirm('Delete all kids and history? This cannot be undone.')) return;
+  if (!confirm('Delete all kids and history for everyone? This cannot be undone.')) return;
   state = { kids: [] };
-  save();
+  saveToCloud();
   render();
   showToast('All data reset');
 }
 
-// ─── Auto-update (cache-busting via version check, no service worker needed) ─
+// ─── Auto-update (cache-busting via version check) ───────────────────────────
 async function checkForUpdate() {
   try {
     const bust = Date.now();
@@ -573,7 +851,7 @@ async function checkForUpdate() {
     const remoteVersion = parseInt(match[1], 10);
     const localVersion  = parseInt(APP_VERSION, 10);
     if (remoteVersion > localVersion) {
-      if (confirm(`A new version of Rewards is available (v${remoteVersion}). Update now?\n\nYour data will be saved automatically.`)) {
+      if (confirm(`A new version of Rewards is available (v${remoteVersion}). Update now?`)) {
         autoUpdate();
       }
     }
@@ -581,7 +859,6 @@ async function checkForUpdate() {
 }
 
 async function autoUpdate() {
-  sessionStorage.setItem('rewards_update_restore', JSON.stringify(state));
   if ('caches' in window) {
     const keys = await caches.keys();
     await Promise.all(keys.map(k => caches.delete(k)));
@@ -589,24 +866,19 @@ async function autoUpdate() {
   location.reload(true);
 }
 
-function restoreAfterUpdate() {
-  const raw = sessionStorage.getItem('rewards_update_restore');
-  if (!raw) return;
-  sessionStorage.removeItem('rewards_update_restore');
-  try {
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data.kids)) return;
-    state = { kids: data.kids };
-    save();
-    showToast('✅ Data restored after update');
-  } catch {}
-}
-
 // ─── Changelog ────────────────────────────────────────────────────────────────
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v3 — Current</div>
+      <div class="cl-version">v4 — Current</div>
+      <ul class="cl-list">
+        <li>Multi-device sync: data now lives in your own Firebase project (Firestore) instead of only on one device</li>
+        <li>Sign in / sign up screen (email + password) so multiple parents can share the same data</li>
+        <li>Each family connects their own free Firebase project — data is never shared between families</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v3</div>
       <ul class="cl-list">
         <li>Switched currency symbol from £ to $</li>
       </ul>
@@ -630,11 +902,14 @@ function renderChangelog() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-load();
-restoreAfterUpdate();
-renderChangelog();
-render();
-checkForUpdate();
+(function init() {
+  const cfg = loadFirebaseConfig();
+  if (!cfg) {
+    showScreen('setup-screen');
+    return;
+  }
+  initFirebase(cfg);
+})();
 </script>
 </body>
 </html>
