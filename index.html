@@ -167,9 +167,6 @@
   .link-row { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
   .link-row a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   .auth-error { color: var(--negative); font-size: 12px; margin-top: -6px; margin-bottom: 12px; min-height: 14px; }
-  .toggle-row { display: flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; margin-bottom: 20px; }
-  .toggle-btn { flex: 1; background: none; border: none; padding: 9px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: 'Inter', sans-serif; }
-  .toggle-btn.active { background: var(--surface); color: var(--text); }
   .btn-google { background: #fff; color: #1f1f1f; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #dadce0; }
   .btn-google:active { background: #f1f3f4; }
   .btn-google img { flex-shrink: 0; }
@@ -180,15 +177,10 @@
 </head>
 <body>
 
-<!-- Auth screen: sign in / sign up -->
+<!-- Auth screen: sign in only (sign-up removed — accounts created via Firebase console) -->
 <div class="screen" id="auth-screen">
   <div class="screen-wordmark">Reward<span>$</span></div>
   <div class="screen-sub" id="auth-project-label">Sign in to your family's project</div>
-
-  <div class="toggle-row">
-    <button class="toggle-btn active" id="toggle-signin" onclick="setAuthMode('signin')">Sign In</button>
-    <button class="toggle-btn" id="toggle-signup" onclick="setAuthMode('signup')">Sign Up</button>
-  </div>
 
   <div class="field">
     <label>Email</label>
@@ -358,7 +350,7 @@
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 const FIRESTORE_DOC_PATH = ['families', 'shared'];
 
@@ -394,7 +386,6 @@ let state = { kids: [] };
 let editingKidId = null;
 let selectedEmoji = KID_EMOJIS[0];
 let cashoutKidId = null;
-let authMode = 'signin';
 
 let fbApp = null, fbAuth = null, fbDb = null;
 let firestoreUnsub = null;
@@ -471,14 +462,6 @@ function saveToCloud() {
 }
 
 // ─── Auth screen logic ────────────────────────────────────────────────────────
-function setAuthMode(mode) {
-  authMode = mode;
-  document.getElementById('toggle-signin').classList.toggle('active', mode === 'signin');
-  document.getElementById('toggle-signup').classList.toggle('active', mode === 'signup');
-  document.getElementById('auth-submit-btn').textContent = mode === 'signin' ? 'Sign In' : 'Sign Up';
-  document.getElementById('auth-error').textContent = '';
-}
-
 function submitAuth() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
@@ -486,11 +469,8 @@ function submitAuth() {
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = 'Enter an email and password.'; return; }
 
-  const action = authMode === 'signin'
-    ? fbAuth.signInWithEmailAndPassword(email, password)
-    : fbAuth.createUserWithEmailAndPassword(email, password);
-
-  action.catch(err => { errEl.textContent = friendlyAuthError(err); });
+  fbAuth.signInWithEmailAndPassword(email, password)
+    .catch(err => { errEl.textContent = friendlyAuthError(err); });
 }
 
 function signInWithGoogle() {
@@ -511,9 +491,7 @@ function signInWithGoogle() {
 function friendlyAuthError(err) {
   const map = {
     'auth/wrong-password': 'Incorrect password.',
-    'auth/user-not-found': 'No account with that email — try Sign Up.',
-    'auth/email-already-in-use': 'That email already has an account — try Sign In.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
+    'auth/user-not-found': 'No account with that email.',
     'auth/invalid-email': 'That email address looks invalid.',
     'auth/invalid-credential': 'Incorrect email or password.',
     'auth/operation-not-allowed': 'Google sign-in isn\'t enabled for this Firebase project yet.',
@@ -832,7 +810,13 @@ async function autoUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v7 — Current</div>
+      <div class="cl-version">v8 — Current</div>
+      <ul class="cl-list">
+        <li>Removed self-serve sign-up — sign in only now (accounts are created via the Firebase console)</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v7</div>
       <ul class="cl-list">
         <li>Firebase project is now built into the app — no setup screen, sign in (or sign up) straight away</li>
         <li>Forking this repo? Edit FIREBASE_CONFIG near the top of the script to point at your own Firebase project</li>
