@@ -182,7 +182,7 @@
 
 <!-- Setup screen: connect a Firebase project (first run) -->
 <div class="screen" id="setup-screen">
-  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="screen-wordmark">Reward<span>$</span></div>
   <div class="screen-sub">Connect your family's Firebase project</div>
 
   <div class="info-box">
@@ -236,7 +236,7 @@ service cloud.firestore {
 
 <!-- Auth screen: sign in / sign up -->
 <div class="screen" id="auth-screen">
-  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="screen-wordmark">Reward<span>$</span></div>
   <div class="screen-sub" id="auth-project-label">Sign in to your family's project</div>
 
   <div class="toggle-row">
@@ -266,7 +266,7 @@ service cloud.firestore {
 </div>
 
 <div class="screen" id="loading-screen">
-  <div class="screen-wordmark">Reward<span>s</span></div>
+  <div class="screen-wordmark">Reward<span>$</span></div>
   <div class="center-spinner">Connecting…</div>
 </div>
 
@@ -274,7 +274,7 @@ service cloud.firestore {
 
   <header>
     <div>
-      <div class="wordmark">Reward<span>s</span></div>
+      <div class="wordmark">Reward<span>$</span></div>
       <div class="date-label" id="date-label"></div>
     </div>
     <div class="total-block">
@@ -420,7 +420,7 @@ service cloud.firestore {
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 const FIRESTORE_DOC_PATH = ['families', 'shared'];
 
@@ -901,7 +901,13 @@ async function autoUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v5 — Current</div>
+      <div class="cl-version">v6 — Current</div>
+      <ul class="cl-list">
+        <li>Logo now reads "Reward$" — the gold "s" is a dollar sign</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v5</div>
       <ul class="cl-list">
         <li>Added "Continue with Google" sign-in option alongside email/password</li>
         <li>Google sign-in is optional — enable it in your Firebase project's Authentication settings if you want it</li>
