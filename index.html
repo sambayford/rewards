@@ -189,6 +189,7 @@
   <button class="btn btn-primary" style="width:100%" id="auth-submit-btn" onclick="submitAuth()">Sign In</button>
 
   <div class="link-row"><a onclick="forgotPassword()">Forgot password?</a></div>
+  <div class="link-row"><a onclick="sendEmailLink()">Email me a sign-in link instead</a></div>
 </div>
 
 <div class="screen" id="loading-screen">
@@ -339,7 +340,7 @@
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 const FIRESTORE_DOC_PATH = ['families', 'shared'];
 
@@ -348,7 +349,9 @@ const FIRESTORE_DOC_PATH = ['families', 'shared'];
 // repo to run your own instance? Just replace the values below with your own
 // Firebase project's config (Project settings → General → Your apps in the
 // Firebase console), and make sure your project has:
-//   1. Authentication → Email/Password enabled
+//   1. Authentication → Email/Password enabled (and optionally Email Link,
+//      a passwordless "magic link" option — enable under Authentication →
+//      Sign-in method → Email/Password → Email link toggle)
 //   2. A Firestore database created
 //   3. These Firestore rules published:
 //        rules_version = '2';
@@ -359,6 +362,12 @@ const FIRESTORE_DOC_PATH = ['families', 'shared'];
 //            }
 //          }
 //        }
+//      NOTE: both Email/Password and Email Link auto-create a new Firebase
+//      user for any email that completes a sign-in flow with a matching
+//      password, or clicks a valid link. There's no invite-only allowlist
+//      here — if you want to restrict access to specific people, change
+//      the rule above to check request.auth.token.email against a fixed
+//      list instead of just "!= null".
 //   4. Parent accounts created manually via Authentication → Users → Add
 //      user (there's no self-serve sign-up in this app)
 const FIREBASE_CONFIG = {
@@ -389,18 +398,34 @@ function showScreen(id) {
 }
 
 // ─── Firebase init ────────────────────────────────────────────────────────────
+const EMAIL_LINK_STORAGE_KEY = 'rewards_email_for_signin';
+
 function initFirebase(cfg) {
   try {
     fbApp = firebase.initializeApp(cfg);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     showScreen('loading-screen');
+    completeEmailLinkSignInIfNeeded();
     fbAuth.onAuthStateChanged(onAuthChanged);
   } catch (e) {
     console.error(e);
     showToast('⚠️ Could not connect to Firebase — check FIREBASE_CONFIG');
     showScreen('auth-screen');
   }
+}
+
+function completeEmailLinkSignInIfNeeded() {
+  if (!fbAuth.isSignInWithEmailLink(window.location.href)) return;
+  let email = window.localStorage.getItem(EMAIL_LINK_STORAGE_KEY);
+  if (!email) {
+    email = window.prompt('Confirm the email address you requested the sign-in link with:');
+  }
+  if (!email) { window.history.replaceState({}, document.title, window.location.pathname); return; }
+  fbAuth.signInWithEmailLink(email, window.location.href)
+    .then(() => window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY))
+    .catch(err => showToast('⚠️ ' + friendlyAuthError(err)))
+    .finally(() => window.history.replaceState({}, document.title, window.location.pathname));
 }
 
 function onAuthChanged(user) {
@@ -459,12 +484,31 @@ function submitAuth() {
     .catch(err => { errEl.textContent = friendlyAuthError(err); });
 }
 
+function sendEmailLink() {
+  const email = document.getElementById('auth-email').value.trim();
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Enter your email above first.'; return; }
+  const actionCodeSettings = {
+    url: window.location.origin + window.location.pathname,
+    handleCodeInApp: true
+  };
+  fbAuth.sendSignInLinkToEmail(email, actionCodeSettings)
+    .then(() => {
+      window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, email);
+      showToast('✅ Check your email for a sign-in link');
+    })
+    .catch(err => { errEl.textContent = friendlyAuthError(err); });
+}
+
 function friendlyAuthError(err) {
   const map = {
     'auth/wrong-password': 'Incorrect password.',
     'auth/user-not-found': 'No account with that email.',
     'auth/invalid-email': 'That email address looks invalid.',
     'auth/invalid-credential': 'Incorrect email or password.',
+    'auth/invalid-action-code': 'That sign-in link is invalid or has already been used.',
+    'auth/expired-action-code': 'That sign-in link has expired — request a new one.',
   };
   return map[err.code] || err.message || 'Something went wrong.';
 }
@@ -779,7 +823,13 @@ async function autoUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v9 — Current</div>
+      <div class="cl-version">v10 — Current</div>
+      <ul class="cl-list">
+        <li>Added "Email me a sign-in link" — passwordless sign-in via a link sent to your email</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v9</div>
       <ul class="cl-list">
         <li>Removed "Continue with Google" — sign-in is email/password only now</li>
       </ul>
