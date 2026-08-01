@@ -180,60 +180,6 @@
 </head>
 <body>
 
-<!-- Setup screen: connect a Firebase project (first run) -->
-<div class="screen" id="setup-screen">
-  <div class="screen-wordmark">Reward<span>$</span></div>
-  <div class="screen-sub">Connect your family's Firebase project</div>
-
-  <div class="info-box">
-    Rewards syncs across every parent's device using your own free
-    Firebase project — nobody else's data mixes with yours.
-    <ol>
-      <li>Go to <strong>console.firebase.google.com</strong> and create a project (free tier is enough)</li>
-      <li>In <strong>Build → Authentication</strong>, enable the <strong>Email/Password</strong> sign-in method (and optionally <strong>Google</strong>, if you'd like to sign in with a Google account instead)</li>
-      <li>In <strong>Build → Firestore Database</strong>, create a database (production mode is fine)</li>
-      <li>In Firestore's <strong>Rules</strong> tab, paste this and click Publish:
-        <div class="rules-box">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}</div>
-      </li>
-      <li>In <strong>Project settings → General</strong>, scroll to "Your apps", add a Web app, and copy the config values below</li>
-    </ol>
-  </div>
-
-  <div class="field">
-    <label>API Key</label>
-    <input type="text" id="cfg-apiKey" placeholder="AIzaSy...">
-  </div>
-  <div class="field">
-    <label>Auth Domain</label>
-    <input type="text" id="cfg-authDomain" placeholder="yourproject.firebaseapp.com">
-  </div>
-  <div class="field">
-    <label>Project ID</label>
-    <input type="text" id="cfg-projectId" placeholder="yourproject">
-  </div>
-  <div class="field">
-    <label>Storage Bucket</label>
-    <input type="text" id="cfg-storageBucket" placeholder="yourproject.appspot.com">
-  </div>
-  <div class="field">
-    <label>Messaging Sender ID</label>
-    <input type="text" id="cfg-messagingSenderId" placeholder="123456789">
-  </div>
-  <div class="field">
-    <label>App ID</label>
-    <input type="text" id="cfg-appId" placeholder="1:123456789:web:abc123">
-  </div>
-  <div class="auth-error" id="setup-error"></div>
-  <button class="btn btn-primary" style="width:100%" onclick="saveFirebaseConfig()">Connect</button>
-</div>
-
 <!-- Auth screen: sign in / sign up -->
 <div class="screen" id="auth-screen">
   <div class="screen-wordmark">Reward<span>$</span></div>
@@ -262,7 +208,6 @@ service cloud.firestore {
   </button>
 
   <div class="link-row"><a onclick="forgotPassword()">Forgot password?</a></div>
-  <div class="link-row"><a onclick="changeFirebaseProject()">Use a different Firebase project</a></div>
 </div>
 
 <div class="screen" id="loading-screen">
@@ -318,13 +263,6 @@ service cloud.firestore {
         <div class="settings-row-label">Sign out</div>
       </div>
       <div>🚪</div>
-    </div>
-    <div class="settings-row danger" onclick="changeFirebaseProject()">
-      <div>
-        <div class="settings-row-label">Disconnect Firebase project</div>
-        <div class="settings-row-sub">Sign out and reset the connection</div>
-      </div>
-      <div>🔌</div>
     </div>
 
     <div class="section-head">
@@ -420,9 +358,37 @@ service cloud.firestore {
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '6';
+const APP_VERSION = '7';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 const FIRESTORE_DOC_PATH = ['families', 'shared'];
+
+// ─── Firebase project config ──────────────────────────────────────────────────
+// This app is hardcoded to one Firebase project (Sam's family). Forking this
+// repo to run your own instance? Just replace the values below with your own
+// Firebase project's config (Project settings → General → Your apps in the
+// Firebase console), and make sure your project has:
+//   1. Authentication → Email/Password (and optionally Google) enabled
+//   2. A Firestore database created
+//   3. These Firestore rules published:
+//        rules_version = '2';
+//        service cloud.firestore {
+//          match /databases/{database}/documents {
+//            match /{document=**} {
+//              allow read, write: if request.auth != null;
+//            }
+//          }
+//        }
+//   4. Your GitHub Pages domain added under Authentication → Settings →
+//      Authorized domains (needed for Google sign-in to work)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC7H-I8rSp1FF0tLEUvicN5gB6tcv3EGiQ",
+  authDomain: "rewards-14944.firebaseapp.com",
+  projectId: "rewards-14944",
+  storageBucket: "rewards-14944.firebasestorage.app",
+  messagingSenderId: "396769311419",
+  appId: "1:396769311419:web:f3c6f050b755e43f16879e",
+  measurementId: "G-MC6YYEP1WE"
+};
 
 let state = { kids: [] };
 let editingKidId = null;
@@ -442,47 +408,12 @@ function showScreen(id) {
   document.getElementById('bottom-nav').style.display = (id === 'main-app') ? 'flex' : 'none';
 }
 
-// ─── Firebase config (per-family, stored locally only) ───────────────────────
-function loadFirebaseConfig() {
-  try {
-    const raw = localStorage.getItem('rewards_firebase_config');
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveFirebaseConfig() {
-  const cfg = {
-    apiKey: document.getElementById('cfg-apiKey').value.trim(),
-    authDomain: document.getElementById('cfg-authDomain').value.trim(),
-    projectId: document.getElementById('cfg-projectId').value.trim(),
-    storageBucket: document.getElementById('cfg-storageBucket').value.trim(),
-    messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
-    appId: document.getElementById('cfg-appId').value.trim(),
-  };
-  if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) {
-    document.getElementById('setup-error').textContent = 'Please fill in at least API Key, Auth Domain, Project ID and App ID.';
-    return;
-  }
-  document.getElementById('setup-error').textContent = '';
-  localStorage.setItem('rewards_firebase_config', JSON.stringify(cfg));
-  initFirebase(cfg);
-}
-
-function changeFirebaseProject() {
-  if (!confirm('This signs you out and forgets this project\'s connection on this device. You can reconnect (or connect a different project) afterwards.')) return;
-  try { if (fbAuth) fbAuth.signOut(); } catch {}
-  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
-  localStorage.removeItem('rewards_firebase_config');
-  location.reload();
-}
-
 // ─── Firebase init ────────────────────────────────────────────────────────────
 function initFirebase(cfg) {
   try {
     fbApp = firebase.initializeApp(cfg);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
-    document.getElementById('auth-project-label').textContent = `Sign in to "${cfg.projectId}"`;
     showScreen('loading-screen');
     fbAuth.getRedirectResult().catch(err => {
       console.warn('Redirect sign-in error:', err);
@@ -490,8 +421,8 @@ function initFirebase(cfg) {
     fbAuth.onAuthStateChanged(onAuthChanged);
   } catch (e) {
     console.error(e);
-    document.getElementById('setup-error').textContent = 'Could not connect — check the values and try again.';
-    showScreen('setup-screen');
+    showToast('⚠️ Could not connect to Firebase — check FIREBASE_CONFIG');
+    showScreen('auth-screen');
   }
 }
 
@@ -901,7 +832,14 @@ async function autoUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v6 — Current</div>
+      <div class="cl-version">v7 — Current</div>
+      <ul class="cl-list">
+        <li>Firebase project is now built into the app — no setup screen, sign in (or sign up) straight away</li>
+        <li>Forking this repo? Edit FIREBASE_CONFIG near the top of the script to point at your own Firebase project</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v6</div>
       <ul class="cl-list">
         <li>Logo now reads "Reward$" — the gold "s" is a dollar sign</li>
       </ul>
@@ -947,12 +885,7 @@ function renderChangelog() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 (function init() {
-  const cfg = loadFirebaseConfig();
-  if (!cfg) {
-    showScreen('setup-screen');
-    return;
-  }
-  initFirebase(cfg);
+  initFirebase(FIREBASE_CONFIG);
 })();
 </script>
 </body>
