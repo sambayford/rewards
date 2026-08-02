@@ -167,6 +167,11 @@
   .link-row { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
   .link-row a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   .auth-error { color: var(--negative); font-size: 12px; margin-top: -6px; margin-bottom: 12px; min-height: 14px; }
+  .btn-google { background: #fff; color: #1f1f1f; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #dadce0; }
+  .btn-google:active { background: #f1f3f4; }
+  .btn-google img { flex-shrink: 0; }
+  .divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--muted); font-size: 12px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
   .center-spinner { text-align: center; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; margin-top: 60px; }
 </style>
 </head>
@@ -190,6 +195,12 @@
 
   <div class="link-row"><a onclick="forgotPassword()">Forgot password?</a></div>
   <div class="link-row"><a onclick="sendEmailLink()">Email me a sign-in link instead</a></div>
+
+  <div class="divider"><span>or</span></div>
+  <button class="btn btn-google" style="width:100%" onclick="signInWithGoogle()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="18" height="18">
+    Continue with Google
+  </button>
 </div>
 
 <div class="screen" id="loading-screen">
@@ -340,7 +351,7 @@
 <div id="toast"></div>
 
 <script>
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 const KID_EMOJIS = ['🧒','👦','👧','👶','🧑','👱','👧🏽','👦🏿','🐣','⭐','🚀','🦄'];
 const FIRESTORE_DOC_PATH = ['families', 'shared'];
 
@@ -349,27 +360,33 @@ const FIRESTORE_DOC_PATH = ['families', 'shared'];
 // repo to run your own instance? Just replace the values below with your own
 // Firebase project's config (Project settings → General → Your apps in the
 // Firebase console), and make sure your project has:
-//   1. Authentication → Email/Password enabled (and optionally Email Link,
-//      a passwordless "magic link" option — enable under Authentication →
-//      Sign-in method → Email/Password → Email link toggle)
+//   1. Authentication → Email/Password enabled, and optionally Email Link
+//      (passwordless "magic link", under Authentication → Sign-in method →
+//      Email/Password → Email link toggle) and/or Google
 //   2. A Firestore database created
-//   3. These Firestore rules published:
+//   3. Firestore rules that check auth AND a specific approved email/UID —
+//      do NOT just use "if request.auth != null" if any sign-in method can
+//      auto-create accounts (Email/Password, Email Link and Google all can).
+//      Example, restricting to one email:
 //        rules_version = '2';
 //        service cloud.firestore {
 //          match /databases/{database}/documents {
 //            match /{document=**} {
-//              allow read, write: if request.auth != null;
+//              allow read, write: if request.auth != null
+//                && request.auth.token.email == 'you@example.com';
 //            }
 //          }
 //        }
-//      NOTE: both Email/Password and Email Link auto-create a new Firebase
-//      user for any email that completes a sign-in flow with a matching
-//      password, or clicks a valid link. There's no invite-only allowlist
-//      here — if you want to restrict access to specific people, change
-//      the rule above to check request.auth.token.email against a fixed
-//      list instead of just "!= null".
-//   4. Parent accounts created manually via Authentication → Users → Add
-//      user (there's no self-serve sign-up in this app)
+//      For more than one approved person, use
+//      request.auth.token.email in ['a@example.com', 'b@example.com'].
+//      Sam's project uses this pattern, restricted to 4.bayfords@gmail.com —
+//      that's why Google/Email Link sign-in were safe to (re-)enable despite
+//      auto-creating accounts for anyone: the Firestore rule is the real
+//      gatekeeper, not which sign-in methods are turned on.
+//   4. Google sign-in additionally needs your GitHub Pages domain added
+//      under Authentication → Settings → Authorized domains
+//   5. Parent accounts still created manually via Authentication → Users →
+//      Add user if using Email/Password (there's no self-serve sign-up)
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyC7H-I8rSp1FF0tLEUvicN5gB6tcv3EGiQ",
   authDomain: "rewards-14944.firebaseapp.com",
@@ -407,6 +424,9 @@ function initFirebase(cfg) {
     fbDb = firebase.firestore();
     showScreen('loading-screen');
     completeEmailLinkSignInIfNeeded();
+    fbAuth.getRedirectResult().catch(err => {
+      console.warn('Redirect sign-in error:', err);
+    });
     fbAuth.onAuthStateChanged(onAuthChanged);
   } catch (e) {
     console.error(e);
@@ -501,6 +521,21 @@ function sendEmailLink() {
     .catch(err => { errEl.textContent = friendlyAuthError(err); });
 }
 
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  document.getElementById('auth-error').textContent = '';
+  fbAuth.signInWithPopup(provider).catch(err => {
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+      // Fall back to redirect flow (some mobile browsers block popups)
+      fbAuth.signInWithRedirect(provider).catch(err2 => {
+        document.getElementById('auth-error').textContent = friendlyAuthError(err2);
+      });
+      return;
+    }
+    document.getElementById('auth-error').textContent = friendlyAuthError(err);
+  });
+}
+
 function friendlyAuthError(err) {
   const map = {
     'auth/wrong-password': 'Incorrect password.',
@@ -509,6 +544,8 @@ function friendlyAuthError(err) {
     'auth/invalid-credential': 'Incorrect email or password.',
     'auth/invalid-action-code': 'That sign-in link is invalid or has already been used.',
     'auth/expired-action-code': 'That sign-in link has expired — request a new one.',
+    'auth/operation-not-allowed': 'Google sign-in isn\'t enabled for this Firebase project yet.',
+    'auth/account-exists-with-different-credential': 'That email is already linked to a different sign-in method.',
   };
   return map[err.code] || err.message || 'Something went wrong.';
 }
@@ -823,7 +860,13 @@ async function autoUpdate() {
 function renderChangelog() {
   document.getElementById('changelog').innerHTML = `
     <div class="cl-entry">
-      <div class="cl-version">v10 — Current</div>
+      <div class="cl-version">v11 — Current</div>
+      <ul class="cl-list">
+        <li>Re-added "Continue with Google" — safe now that Firestore rules restrict data access to one approved email, not just "signed in"</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
+      <div class="cl-version">v10</div>
       <ul class="cl-list">
         <li>Added "Email me a sign-in link" — passwordless sign-in via a link sent to your email</li>
       </ul>
